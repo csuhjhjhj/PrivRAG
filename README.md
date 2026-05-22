@@ -1,46 +1,118 @@
-# PrivRAG Demo
+# PrivRAG
 
-隐私保护RAG原型展示系统。后端使用 Flask，前端使用 Vue CDN，由 Flask 直接托管静态页面，适合先部署到服务器做课题展示。
+PrivRAG is a lightweight privacy-preserving Retrieval-Augmented Generation (RAG) prototype. It implements a Flask backend and a Vue-based web UI for experimenting with privacy-aware query routing, risk assessment, retrieval strategy selection, and audit logging.
 
-## 功能
+The current implementation focuses on the system workflow and extensible interfaces. It uses a small built-in knowledge base and TF-IDF retrieval to keep the project easy to run, while reserving clear integration points for production embedding models, vector databases, differential privacy modules, and homomorphic-encryption backends.
 
-- 查询敏感度识别：PII、商业机密、技术敏感、高安全关键词
-- L0-L4动态路由：基线、轻量保护、DistanceDP、FHE密态检索、TEE可选增强
-- 多索引路线展示：HNSW、IVF-PQ、Flat、Encrypted HNSW
-- 可选测试场景：普通知识查询、个人信息查询、核心技术查询、密钥保护场景、基线对照实验
-- 分级保护页面：解释为什么需要L0-L4，并提供各等级路线对比
-- 创新架构页面：展示从查询输入到安全生成、审计留痕的完整链路
-- Top-K知识片段检索：使用 TF-IDF 模拟向量检索流程
-- 安全生成说明：展示最小必要上下文和保护路线
-- 审计日志：记录风险等级、保护路线、索引类型和操作链
+## Features
 
-## 本地运行
+- Query risk analysis for PII, business-sensitive terms, technical-sensitive terms, and high-security keywords
+- L0-L4 protection-level routing:
+  - L0: Plain RAG baseline
+  - L1: lightweight input protection and context minimization
+  - L2: DistanceDP-style query perturbation
+  - L3: FHE-oriented encrypted retrieval path
+  - L4: optional TEE-based key-protection enhancement
+- Retrieval strategy selection across HNSW, IVF-PQ, Flat, and Encrypted HNSW routes
+- Scenario-based query testing for normal knowledge queries, PII-bearing queries, technical-sensitive queries, key-protection cases, and baseline evaluation
+- Top-K document retrieval over a built-in knowledge base
+- Safe-generation explanation with minimal-context handling
+- Audit log recording for risk level, selected route, index type, and protection operations
+
+## Architecture
+
+```text
+frontend/          Vue single-page UI served as static files
+backend/app.py     Flask application and API routes
+data/              Runtime audit log directory
+requirements.txt   Python dependencies
+run_server.sh      Simple Linux startup script
+privrag.service    Example systemd unit
+```
+
+Runtime flow:
+
+```text
+Query
+  -> sensitive entity detection
+  -> risk scoring
+  -> L0-L4 route selection
+  -> index strategy selection
+  -> protected retrieval
+  -> safe answer construction
+  -> audit logging
+```
+
+## API
+
+### `GET /api/health`
+
+Returns service health and document count.
+
+### `GET /api/config`
+
+Returns protection-level metadata, pipeline steps, and available index routes.
+
+### `POST /api/query`
+
+Runs the PrivRAG query pipeline.
+
+Request:
+
+```json
+{
+  "query": "客户张三反馈账号无法登录，手机号是13812345678，请帮我查相关售后处理记录。"
+}
+```
+
+Response includes:
+
+- risk score and sensitive entities
+- selected L0-L4 route
+- selected index strategy
+- protection operations
+- retrieved snippets
+- generated answer
+- demo metrics
+
+### `GET /api/audit`
+
+Returns recent audit records.
+
+### `GET /api/documents`
+
+Returns metadata for the built-in knowledge base.
+
+## Local Run
 
 ```bash
 cd privrag_demo
+pip install -r requirements.txt
 python backend/app.py
 ```
 
-访问：
+Open:
 
 ```text
 http://127.0.0.1:5000
 ```
 
-## 服务器部署
+## Deployment
 
-直接将 `privrag_demo` 上传到服务器，安装依赖后运行：
+The service can be started directly:
 
 ```bash
-pip install -r requirements.txt
-python backend/app.py
+PRIVRAG_HOST=0.0.0.0 PRIVRAG_PORT=5000 PRIVRAG_DEBUG=0 python backend/app.py
 ```
 
-生产环境可用 `gunicorn` 或 `waitress` 托管 Flask。
+Or with the included helper:
 
-也可以直接使用仓库内的 `run_server.sh` 或 `privrag.service` 作为服务器启动模板。
+```bash
+chmod +x run_server.sh
+./run_server.sh
+```
 
-可选环境变量：
+Optional environment variables:
 
 ```bash
 PRIVRAG_HOST=0.0.0.0
@@ -48,8 +120,21 @@ PRIVRAG_PORT=5000
 PRIVRAG_DEBUG=0
 ```
 
-如果服务器不能访问外网 CDN，可将 Vue 运行时下载到 `frontend/assets/vue.global.prod.js`，再把 `frontend/index.html` 中的 Vue 引用改成本地路径。
+For long-running deployment, `privrag.service` can be adapted as a systemd unit. In production, consider using a WSGI server such as Gunicorn or uWSGI behind Nginx.
 
-## 说明
+If the runtime environment cannot access the Vue CDN, download the Vue runtime to `frontend/assets/vue.global.prod.js` and update `frontend/index.html` to reference the local file.
 
-当前版本是展示型原型：L1/L2策略、敏感识别、路由和审计为真实逻辑；FHE、加密HNSW和TEE部分以接口化和流程展示为主。后续可以逐步接入真实 embedding、FAISS HNSW、TenSEAL/SEAL 小规模密态计算和文档上传模块。
+## Extension Points
+
+The current prototype keeps heavy cryptographic and vector-database components modular. Suggested next steps:
+
+- Replace TF-IDF retrieval with embedding-based retrieval
+- Connect FAISS or Milvus for HNSW, IVF-PQ, and Flat indexes
+- Add a real DistanceDP perturbation module
+- Add a TenSEAL or Microsoft SEAL based small-scale encrypted inner-product demo
+- Add document upload and index rebuild APIs
+- Add persistent storage for audit logs and retrieval experiments
+
+## Notes
+
+This project is a research prototype. L1/L2 routing, sensitive-entity detection, route selection, and audit logging are implemented as executable logic. FHE, Encrypted HNSW, and TEE paths are represented as route-level interfaces and workflow modules, ready for progressive replacement with concrete cryptographic implementations.
