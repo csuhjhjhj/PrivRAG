@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PrivRAG 隐私保护RAG原型系统</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  </head>
+  <body>
+    <div id="app" v-cloak>
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">P</div>
+          <div>
+            <h1>PrivRAG</h1>
+            <p>隐私保护RAG原型系统</p>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <button :class="{active: tab === 'overview'}" @click="tab = 'overview'">创新总览</button>
+          <button :class="{active: tab === 'query'}" @click="tab = 'query'">流程演示</button>
+          <button :class="{active: tab === 'levels'}" @click="tab = 'levels'">L0-L4分级</button>
+          <button :class="{active: tab === 'architecture'}" @click="tab = 'architecture'">创新架构</button>
+          <button :class="{active: tab === 'audit'}" @click="openAudit">审计日志</button>
+        </nav>
+
+        <div class="side-note">
+          <strong>核心定位</strong>
+          <span>不依赖TEE的纯密码学主线，TEE仅作为L4可选密钥增强。</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Privacy-preserving Retrieval-Augmented Generation</p>
+            <h2>{{ pageTitle }}</h2>
+          </div>
+          <div class="status">
+            <span class="dot"></span>
+            Flask + Vue Demo
+          </div>
+        </header>
+
+        <section v-if="tab === 'overview'" class="overview">
+          <div class="hero-panel">
+            <div>
+              <p class="eyebrow">What this demo proves</p>
+              <h3>把“隐私保护RAG”的创新点变成一次可解释的查询流程</h3>
+              <p>
+                这个系统不是为了展示一个普通聊天机器人，而是展示：企业RAG查询进入系统后，
+                如何被识别风险、选择L0-L4保护等级、适配HNSW/IVF-PQ/Flat索引，并形成可审计的安全闭环。
+              </p>
+              <div class="hero-actions">
+                <button class="primary" @click="goDemo">一键运行示例</button>
+                <button class="secondary" @click="tab = 'architecture'">查看创新架构</button>
+              </div>
+            </div>
+            <div class="thesis-card">
+              <span>一句话目标</span>
+              <strong>性能尽量高，安全性讲得清楚，并且不强依赖TEE硬件。</strong>
+            </div>
+          </div>
+
+          <div class="innovation-cards">
+            <article v-for="card in innovationCards" :key="card.title" class="innovation-card">
+              <span>{{ card.tag }}</span>
+              <h3>{{ card.title }}</h3>
+              <p>{{ card.desc }}</p>
+            </article>
+          </div>
+
+          <div class="plain-flow">
+            <div>输入查询</div>
+            <div>识别风险</div>
+            <div>选择等级</div>
+            <div>匹配索引</div>
+            <div>安全生成</div>
+            <div>审计留痕</div>
+          </div>
+        </section>
+
+        <section v-if="tab === 'query'" class="workspace">
+          <div class="panel query-panel">
+            <div class="panel-head">
+              <div>
+                <h3>流程演示</h3>
+                <p>用一次查询展示四个创新点：动态分级、不依赖TEE、加密HNSW、多索引适配与安全审计。</p>
+              </div>
+              <button class="ghost" @click="fillExample">示例</button>
+            </div>
+            <div class="scenario-grid">
+              <button
+                v-for="(scenario, index) in scenarios"
+                :key="scenario.name"
+                :class="{active: scenarioIndex === index}"
+                @click="selectScenario(index)"
+              >
+                <strong>{{ scenario.name }}</strong>
+                <span>{{ scenario.expect }}</span>
+                <small>{{ scenario.desc }}</small>
+              </button>
+            </div>
+            <textarea v-model="queryText" placeholder="例如：请分析客户名单和合同报价是否适合走加密HNSW检索，是否需要TEE保护密钥？"></textarea>
+            <div class="actions">
+              <button class="primary" :disabled="loading" @click="submitQuery">
+                {{ loading ? '分析中...' : '运行PrivRAG流程' }}
+              </button>
+              <button class="secondary" @click="queryText = ''">清空</button>
+            </div>
+          </div>
+
+          <div class="flow-strip">
+            <div v-for="(step, index) in pipeline" :key="step" class="flow-step">
+              <span>{{ index + 1 }}</span>
+              <strong>{{ step }}</strong>
+            </div>
+          </div>
+
+          <div v-if="result" class="result-grid">
+            <div class="panel explain-card">
+              <h3>这次演示体现了什么？</h3>
+              <div class="explain-list">
+                <div v-for="item in resultHighlights" :key="item">{{ item }}</div>
+              </div>
+            </div>
+
+            <div class="panel route-card">
+              <div class="panel-head compact">
+                <h3>1. 系统选择哪条保护路线</h3>
+                <span class="level-badge" :style="{background: result.route.color}">{{ result.route.level }}</span>
+              </div>
+              <h4>{{ result.route.name }}</h4>
+              <p>{{ result.route.reason }}</p>
+              <div class="kv">
+                <span>索引路线</span><strong>{{ result.route.index }}</strong>
+                <span>TEE依赖</span><strong>{{ result.route.is_tee_required ? '可选启用' : '不依赖' }}</strong>
+                <span>保护机制</span><strong>{{ result.route.protection }}</strong>
+              </div>
+            </div>
+
+            <div class="panel risk-card">
+              <div class="panel-head compact">
+                <h3>2. 为什么这样选</h3>
+                <span class="risk-pill">{{ result.risk.level }}</span>
+              </div>
+              <div class="score-ring">
+                <span>{{ Math.round(result.risk.score * 100) }}</span>
+                <small>risk</small>
+              </div>
+              <div class="tags">
+                <span v-if="!result.risk.sensitive_items.length">未识别明显敏感实体</span>
+                <span v-for="item in result.risk.sensitive_items" :key="item.category + item.value">
+                  {{ item.category }}：{{ item.value }}
+                </span>
+              </div>
+            </div>
+
+            <div class="panel operations-card">
+              <h3>3. 实际做了哪些保护</h3>
+              <div class="ops">
+                <div v-for="op in result.protection.operations" :key="op">{{ op }}</div>
+              </div>
+              <p class="protected-query">处理后查询：{{ result.protection.protected_query }}</p>
+            </div>
+
+            <div class="panel metrics-card">
+              <h3>4. 路线代价如何展示</h3>
+              <div class="metric-list">
+                <div>
+                  <span>演示延迟</span>
+                  <strong>{{ result.metrics.latency_ms_demo }} ms</strong>
+                </div>
+                <div>
+                  <span>安全评分</span>
+                  <strong>{{ result.metrics.security_score_demo }}</strong>
+                </div>
+                <div>
+                  <span>检索效果</span>
+                  <strong>{{ result.metrics.retrieval_quality_demo }}</strong>
+                </div>
+                <div>
+                  <span>通信开销</span>
+                  <strong>{{ result.metrics.communication_overhead }}</strong>
+                </div>
+              </div>
+              <small>{{ result.metrics.note }}</small>
+            </div>
+
+            <div class="panel answer-card">
+              <h3>5. 最终安全生成</h3>
+              <p>{{ result.answer }}</p>
+            </div>
+
+            <div class="panel retrieval-card">
+              <h3>6. 最小必要检索片段</h3>
+              <div v-for="doc in result.retrieval" :key="doc.doc_id" class="doc-row">
+                <div class="doc-meta">
+                  <strong>{{ doc.rank }}. {{ doc.title }}</strong>
+                  <span>{{ doc.category }} · 敏感度{{ doc.sensitivity }} · score {{ doc.score }}</span>
+                </div>
+                <p>{{ doc.snippet }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <strong>等待查询</strong>
+            <span>运行后会展示分级路线、检索片段、保护操作链和审计记录。</span>
+          </div>
+        </section>
+
+        <section v-if="tab === 'levels'" class="levels-page">
+          <div class="level-intro">
+            <div>
+              <p class="eyebrow">Why L0-L4</p>
+              <h3>分级不是为了复杂，而是为了避免“一刀切”</h3>
+              <p>
+                企业RAG里有些查询只是普通知识问答，有些查询涉及客户名单、合同、密钥或核心技术。
+                如果全部走最高安全路线，性能开销过高；如果全部走轻量路线，又无法解释安全性。
+                L0-L4把不同保护机制变成可选择、可审计的路线。
+              </p>
+            </div>
+            <div class="level-summary">
+              <strong>核心逻辑</strong>
+              <span>低敏走轻量，中敏走DP，高敏走FHE，密钥保护再启用TEE。</span>
+            </div>
+          </div>
+
+          <div class="level-selector">
+            <button
+              v-for="(level, key) in levels"
+              :key="key"
+              :class="{active: selectedLevel === key}"
+              :style="{borderColor: level.color}"
+              @click="selectedLevel = key"
+            >
+              <span :style="{background: level.color}">{{ key }}</span>
+              <strong>{{ level.name }}</strong>
+            </button>
+          </div>
+
+          <div class="level-detail" v-if="levels[selectedLevel]">
+            <div>
+              <span class="level-badge" :style="{background: levels[selectedLevel].color}">{{ selectedLevel }}</span>
+              <h3>{{ levels[selectedLevel].name }}</h3>
+              <p>{{ levels[selectedLevel].protection }}</p>
+            </div>
+            <div class="kv large">
+              <span>索引形态</span><strong>{{ levels[selectedLevel].index }}</strong>
+              <span>是否生产保护</span><strong>{{ selectedLevel === 'L0' ? '否，仅做对照' : '是，按风险启用' }}</strong>
+              <span>TEE关系</span><strong>{{ selectedLevel === 'L4' ? '可选启用' : '不依赖TEE' }}</strong>
+            </div>
+          </div>
+
+          <div class="level-compare panel">
+            <h3>路线对比</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>等级</th>
+                  <th>通俗理解</th>
+                  <th>主要解决的问题</th>
+                  <th>适合场景</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>L0</td>
+                  <td>不保护，做对照</td>
+                  <td>知道Plain RAG的性能和效果基线</td>
+                  <td>实验评估</td>
+                </tr>
+                <tr>
+                  <td>L1</td>
+                  <td>先把入口收干净</td>
+                  <td>减少Query、上下文和日志暴露</td>
+                  <td>低敏知识问答</td>
+                </tr>
+                <tr>
+                  <td>L2</td>
+                  <td>给查询向量加扰动</td>
+                  <td>降低Embedding和查询意图泄露风险</td>
+                  <td>中敏业务查询</td>
+                </tr>
+                <tr>
+                  <td>L3</td>
+                  <td>检索尽量在密态下完成</td>
+                  <td>保护高敏文档检索过程和向量距离计算</td>
+                  <td>高敏技术/合同/知识库</td>
+                </tr>
+                <tr>
+                  <td>L4</td>
+                  <td>在L3上额外保护密钥</td>
+                  <td>提升密钥管理和策略环境安全性</td>
+                  <td>强合规或密钥保护场景</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-if="tab === 'architecture'" class="architecture">
+          <div class="architecture-intro">
+            <div>
+              <p class="eyebrow">System Architecture</p>
+              <h3>系统不是堆技术，而是把四个创新点串成一条链路</h3>
+              <p>从查询进入到最终回答，每一层都回答一个问题：风险在哪里、该走哪条路线、怎么检索、如何生成、怎样审计。</p>
+            </div>
+          </div>
+
+          <div class="arch-row">
+            <div v-for="node in archNodes" :key="node.title" class="arch-node">
+              <span>{{ node.kicker }}</span>
+              <strong>{{ node.title }}</strong>
+              <p>{{ node.desc }}</p>
+            </div>
+          </div>
+
+          <div class="arch-map panel">
+            <h3>查询在系统里怎么走</h3>
+            <div class="arch-map-grid">
+              <div>
+                <strong>输入</strong>
+                <span>企业Query / 文档片段 / 向量检索请求</span>
+              </div>
+              <div>
+                <strong>判断</strong>
+                <span>识别PII、商业机密、技术敏感和密钥风险</span>
+              </div>
+              <div>
+                <strong>路由</strong>
+                <span>选择L1/L2/L3/L4和HNSW/IVF-PQ/Flat</span>
+              </div>
+              <div>
+                <strong>保护</strong>
+                <span>DP扰动、FHE密态计算、TEE可选密钥保护</span>
+              </div>
+              <div>
+                <strong>输出</strong>
+                <span>最小必要上下文生成，并写入审计日志</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="innovation-panel">
+            <h3>系统创新点</h3>
+            <div class="innovation-grid">
+              <div>不依赖TEE：L2/L3以DP/FHE为核心</div>
+              <div>HNSW核心：加密图索引与Chebyshev近似</div>
+              <div>多索引适配：HNSW / IVF-PQ / Flat</div>
+              <div>动态路由：按查询风险选择L0-L4保护等级</div>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="tab === 'audit'" class="panel audit-panel">
+          <div class="panel-head">
+            <div>
+              <h3>审计日志</h3>
+              <p>记录查询风险、路线选择、索引类型和保护操作。</p>
+            </div>
+            <button class="ghost" @click="loadAudit">刷新</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>风险</th>
+                <th>路线</th>
+                <th>索引</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in auditItems" :key="item.timestamp + item.query">
+                <td>{{ item.timestamp }}</td>
+                <td>{{ item.risk_level }} / {{ item.risk_score }}</td>
+                <td>{{ item.route }}</td>
+                <td>{{ item.index }}</td>
+                <td>{{ item.operations.join('、') }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!auditItems.length" class="empty-table">暂无审计记录</div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

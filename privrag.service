@@ -1,0 +1,16 @@
+[Unit]
+Description=PrivRAG Flask/Vue demo
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/privrag
+Environment=PRIVRAG_HOST=0.0.0.0
+Environment=PRIVRAG_PORT=5000
+Environment=PRIVRAG_DEBUG=0
+ExecStart=/opt/privrag/.venv/bin/python backend/app.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
