@@ -1,4 +1,5 @@
 const { createApp } = Vue;
+const API_BASE = window.location.pathname.startsWith("/privrag") ? "/privrag/api" : "/api";
 
 createApp({
   data() {
@@ -109,7 +110,7 @@ createApp({
   },
   methods: {
     async loadConfig() {
-      const res = await fetch("/api/config");
+      const res = await fetch(`${API_BASE}/config`);
       const data = await res.json();
       this.levels = data.levels;
       this.pipeline = data.pipeline;
@@ -130,7 +131,7 @@ createApp({
       if (!this.queryText.trim()) return;
       this.loading = true;
       try {
-        const res = await fetch("/api/query", {
+        const res = await fetch(`${API_BASE}/query`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: this.queryText }),
@@ -142,7 +143,7 @@ createApp({
       }
     },
     async loadAudit() {
-      const res = await fetch("/api/audit");
+      const res = await fetch(`${API_BASE}/audit`);
       const data = await res.json();
       this.auditItems = data.items.reverse();
     },
